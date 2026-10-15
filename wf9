@@ -1,0 +1,381 @@
+
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import "./App.css";
+
+// Global Context
+const ThemeContext = createContext();
+
+function ThemeProvider({ children }) {
+  const [theme, setTheme] = useState("light");
+
+  function toggleTheme() {
+    setTheme((current) =>
+      current === "light" ? "dark" : "light"
+    );
+  }
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <div className={`app ${theme}`}>
+        {children}
+      </div>
+    </ThemeContext.Provider>
+  );
+}
+
+// Part A1: Counter using useState
+function Counter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <section className="card">
+      <h2>1. useState Counter</h2>
+      <h3>Counter: {count}</h3>
+      <button onClick={() => setCount((c) => c + 1)}>
+        Increment
+      </button>{" "}
+      <button onClick={() => setCount((c) => c - 1)}>
+        Decrement
+      </button>{" "}
+      <button onClick={() => setCount(0)}>
+        Reset
+      </button>
+    </section>
+  );
+}
+
+// Part A2: Reusable custom hook
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchData() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch(url, {
+          signal: controller.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch posts");
+        }
+
+        const result = await response.json();
+        setData(result);
+      } catch (err) {
+        if (err.name !== "AbortError") {
+          setError(err.message || "Something went wrong");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    fetchData();
+
+    // Cleanup: cancel the request if the component unmounts
+    return () => controller.abort();
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+// Part A3: Posts using custom hook
+function Posts() {
+  const [showPosts, setShowPosts] = useState(true);
+  const { data, loading, error } = useFetch(
+    "https://jsonplaceholder.typicode.com/posts?_limit=5"
+  );
+
+  return (
+    <section className="card">
+      <h2>2. useEffect and Custom Hook (useFetch)</h2>
+
+      <button onClick={() => setShowPosts((v) => !v)}>
+        {showPosts ? "Hide Posts" : "Show Posts"}
+      </button>
+
+      {showPosts && (
+        <>
+          {loading && <p>Loading posts...</p>}
+          {error && <p className="error">{error}</p>}
+
+          {data && !loading && !error && (
+            <ul>
+              {data.map((post) => (
+                <li key={post.id}>
+                  <strong>{post.title}</strong>
+                  <p>{post.body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// Part B1: Props drilling: App -> Parent -> Child
+function UserChild({ user }) {
+  return (
+    <div className="nested">
+      <h4>Child Component</h4>
+      <p>Name: {user.name}</p>
+      <p>Role: {user.role}</p>
+    </div>
+  );
+}
+
+function UserParent({ user }) {
+  return (
+    <div className="nested">
+      <h4>Parent Component</h4>
+      <UserChild user={user} />
+    </div>
+  );
+}
+
+function PropsDemo() {
+  const [selectedUser, setSelectedUser] = useState("Jameer");
+
+  const users = {
+    Jameer: { name: "Jameer", role: "Student" },
+    Alex: { name: "Alex", role: "Developer" },
+  };
+
+  return (
+    <section className="card">
+      <h2>3. Props Drilling</h2>
+      <label>
+        Select user:{" "}
+        <select
+          value={selectedUser}
+          onChange={(e) => setSelectedUser(e.target.value)}
+        >
+          <option value="Jameer">Jameer</option>
+          <option value="Alex">Alex</option>
+        </select>
+      </label>
+
+      <p>App passes user data to Parent, then Child.</p>
+      <UserParent user={users[selectedUser]} />
+    </section>
+  );
+}
+
+// Part B2: Lifting state up
+function CounterButtons({ count, setCount }) {
+  return (
+    <div className="nested">
+      <h4>Counter Component</h4>
+      <button onClick={() => setCount((c) => c + 1)}>
+        Increase Shared Count
+      </button>{" "}
+      <button onClick={() => setCount((c) => c - 1)}>
+        Decrease Shared Count
+      </button>
+    </div>
+  );
+}
+
+function DisplayCounter({ count }) {
+  return (
+    <div className="nested">
+      <h4>DisplayCounter Component</h4>
+      <p>Shared Count: {count}</p>
+    </div>
+  );
+}
+
+function LiftedCounter() {
+  const [count, setCount] = useState(0);
+
+  return (
+    <section className="card">
+      <h2>4. Lifting State Up</h2>
+      <p>
+        Both sibling components receive the same state from their
+        common parent.
+      </p>
+      <CounterButtons count={count} setCount={setCount} />
+      <DisplayCounter count={count} />
+    </section>
+  );
+}
+
+// Part B3: Context API
+function ThemeDemo() {
+  const { theme, toggleTheme } = useContext(ThemeContext);
+
+  return (
+    <section className="card">
+      <h2>5. Context API</h2>
+      <p>Current Theme: <strong>{theme.toUpperCase()}</strong></p>
+      <button onClick={toggleTheme}>
+        {theme === "light" ? "🌙 Toggle Dark Theme" : "☀️ Toggle Light Theme"}
+      </button>
+      <p>
+        The theme updates across the whole application without
+        passing theme props through every component.
+      </p>
+    </section>
+  );
+}
+
+// Hooks vs class components
+function HooksComparison() {
+  return (
+    <section className="card">
+      <h2>6. Hooks vs Class Components</h2>
+      <ul>
+        <li>Hooks allow state in functional components.</li>
+        <li>useEffect handles side effects and cleanup.</li>
+        <li>Custom hooks let us reuse logic between components.</li>
+        <li>Hooks often reduce boilerplate compared with classes.</li>
+      </ul>
+    </section>
+  );
+}
+
+function AppContent() {
+  return (
+    <main className="container">
+      <header>
+        <h1>React Hooks and Data Sharing</h1>
+        <p>Explore hooks, props, lifted state, and context.</p>
+      </header>
+
+      <ThemeDemo />
+      <Counter />
+      <Posts />
+      <PropsDemo />
+      <LiftedCounter />
+      <HooksComparison />
+    </main>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+}
+
+.app {
+  min-height: 100vh;
+  padding: 20px 0;
+  transition: background 0.25s, color 0.25s;
+}
+
+.app.light {
+  background: #f3f6fa;
+  color: #222;
+}
+
+.app.dark {
+  background: #181a1b;
+  color: #f5f5f5;
+}
+
+.container {
+  width: min(900px, 92%);
+  margin: auto;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 25px;
+}
+
+.card {
+  padding: 22px;
+  margin: 20px 0;
+  border-radius: 10px;
+  background: white;
+  color: #222;
+  box-shadow: 0 2px 8px #00000015;
+}
+
+.dark .card {
+  background: #292c2f;
+  color: #f5f5f5;
+}
+
+h2 {
+  color: #1769d2;
+}
+
+button {
+  padding: 10px 14px;
+  margin: 5px 0;
+  border: none;
+  border-radius: 5px;
+  background: #1769d2;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #0c4fa8;
+}
+
+.nested {
+  border: 1px solid #aaa;
+  border-radius: 6px;
+  padding: 12px;
+  margin: 12px 0;
+}
+
+select {
+  padding: 8px;
+  margin: 8px;
+}
+
+li {
+  margin-bottom: 12px;
+}
+
+.error {
+  color: #d93025;
+}
+
+@media (max-width: 500px) {
+  .card {
+    padding: 15px;
+  }
+}
+
+import { StrictMode } from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App.jsx";
+
+createRoot(document.getElementById("root")).render(
+  <StrictMode>
+    <App />
+  </StrictMode>
+);
